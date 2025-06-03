@@ -1,43 +1,44 @@
+import threading
 import socket
 import time
 from datetime import datetime
 
-SERVER_IP = '192.168.1.10'  # Ganti dengan IP mesin server
+SERVER_IP = '172.16.16.102'
 PORT = 45000
+JUMLAH_KLIEN_KONKUREN = 5
 
-# Ganti waktu target (format: "HH:MM:SS") sesuai dengan waktu server
-TARGET_TIME = "14:30:00"  # Contoh target waktu
-
-def wait_until(target_time_str):
-    target_time = datetime.strptime(target_time_str, "%H:%M:%S").time()
-    while True:
-        now = datetime.now().time()
-        if now >= target_time:
-            break
-        remaining = (
-            datetime.combine(datetime.today(), target_time) -
-            datetime.combine(datetime.today(), now)
-        ).total_seconds()
-        print(f"[Client] Waiting for {remaining:.1f} seconds...")
-        time.sleep(min(remaining, 1))
-
-def main():
-    print(f"[Client] Waiting until {TARGET_TIME} to send request...")
-    wait_until(TARGET_TIME)
-
+def client_task(client_id, target_time_str):
+    print(f"[Client-{client_id}] Waiting until {target_time_str} to send request...")
     try:
+        target_time_obj = datetime.strptime(target_time_str, "%H:%M:%S").time()
+        while datetime.now().time() < target_time_obj:
+            time.sleep(0.1)
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((SERVER_IP, PORT))
+        print(f"[Client-{client_id}] Connected to server.")
 
         sock.sendall("TIME\r\n".encode())
         response = sock.recv(1024).decode()
-        print(f"[Client] Server responded: {response.strip()}")
+        print(f"[Client-{client_id}] Server responded: {response.strip()}")
 
         sock.sendall("QUIT\r\n".encode())
         sock.close()
+        print(f"[Client-{client_id}] Disconnected.")
 
     except Exception as e:
-        print(f"[Client] Error: {str(e)}")
+        print(f"[Client-{client_id}] Error: {str(e)}")
 
 if __name__ == "__main__":
-    main()
+    threads = []
+    WAKTU_TARGET_SERENTAK = "08:10:00"
+
+    for i in range(JUMLAH_KLIEN_KONKUREN):
+        thread = threading.Thread(target=client_task, args=(i, WAKTU_TARGET_SERENTAK))
+        threads.append(thread)
+        thread.start() 
+
+    for thread in threads:
+        thread.join()
+
+    print("Semua klien konkuren telah selesai.")
